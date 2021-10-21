@@ -14,6 +14,10 @@ interface Exectuer {
     ) external returns (bool success);
 }
 
+interface AvatarOwnerManager {
+    function isOwner(address owner) external view returns (bool);
+}
+
 contract BlacklistGuard is FactoryFriendly, BaseGuard {
     event SetTarget(
         address target,
@@ -28,7 +32,7 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
     event BlacklistGuardSetup(
         address initiator,
         address indexed owner,
-        address indexed avator,
+        address indexed avatar,
         address executor
     );
 
@@ -50,23 +54,31 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
 
     mapping(address => Target) public blockedTargets;
 
-    address public avator;
+    address public avatar;
     Exectuer public executor;
 
-    modifier onlyAvatorAndOwner() {
+    modifier onlyAvatarAndOwner() {
         require(
-            msg.sender == avator || msg.sender == owner(),
-            "Only 'avator' and owner can call"
+            msg.sender == avatar || msg.sender == owner(),
+            "Only 'avatar' and owner can call"
+        );
+        _;
+    }
+    modifier onlyAvatarOwnerAndOwner() {
+        require(
+            AvatarOwnerManager(avatar).isOwner(msg.sender) ||
+                msg.sender == owner(),
+            "Only avatar's Owner and owner can call"
         );
         _;
     }
 
     constructor(
         address _owner,
-        address _avator,
+        address _avatar,
         address _executor
     ) {
-        bytes memory initializeParams = abi.encode(_owner, _avator, _executor);
+        bytes memory initializeParams = abi.encode(_owner, _avatar, _executor);
         setUp(initializeParams);
     }
 
@@ -74,26 +86,26 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override {
         __Ownable_init();
-        (address _owner, address _avator, address _executor) = abi.decode(
+        (address _owner, address _avatar, address _executor) = abi.decode(
             initializeParams,
             (address, address, address)
         );
 
         transferOwnership(_owner);
-        avator = _avator;
+        avatar = _avatar;
         executor = Exectuer(_executor);
 
-        emit BlacklistGuardSetup(msg.sender, _owner, _avator, _executor);
+        emit BlacklistGuardSetup(msg.sender, _owner, _avatar, _executor);
     }
 
-    /// @dev set the Target being Blocked. Only Avator or Owner can call.
+    /// @dev set the Target being Blocked. Only Avatar or Owner can call.
     function setTarget(
         address target,
         bool blockAll,
         bool blockDelegateCall,
         bytes4 functionHash,
         bool blockFunction
-    ) external onlyAvatorAndOwner {
+    ) external onlyAvatarAndOwner {
         Target storage thisTarget = blockedTargets[target];
         thisTarget.allBlocked = blockAll;
         thisTarget.delegateCallBlocked = blockDelegateCall;
@@ -110,7 +122,7 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
 
     function setExceptionalSender(address target, address exceptionalSender)
         external
-        onlyAvatorAndOwner
+        onlyAvatarAndOwner
     {
         blockedTargets[target].exceptFromSender = exceptionalSender;
         emit SetExceptionalSender(target, exceptionalSender);
@@ -140,7 +152,7 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         return blockedTargets[target].exceptFromSender;
     }
 
-    ///@dev request the executor to call Avatar exec function. Then avatar run the Transaction for calling setTarget.
+    ///@dev request the executor to call Avatar's exec function. Then avatar run the Safe Transaction with data which calls setTarget.
     function requestSetTarget(
         address target,
         bool blockAll,
@@ -148,7 +160,7 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         bytes4 functionHash,
         bool blockFunction,
         SafeArgs calldata safeArgs
-    ) public {
+    ) external onlyAvatarOwnerAndOwner {
         bytes memory payload = encodeSetTargetData(
             target,
             blockAll,
@@ -159,12 +171,12 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         sendSafeTransaction(payload, safeArgs);
     }
 
-    ///@dev request the executor to call Avatar exec function. Then avatar run the Transaction.
+    ///@dev request the executor to call Avatar's exec function. Then avatar run the Safe Transaction with data which calls setExceptionalSender.
     function requestSetExceptionalSender(
         address target,
         address exceptionalSender,
         SafeArgs calldata safeArgs
-    ) public {
+    ) external onlyAvatarOwnerAndOwner {
         bytes memory payload = encodeSetExecptionalSender(
             target,
             exceptionalSender
@@ -223,7 +235,7 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         );
 
         executor.execTransactionFromModule(
-            avator,
+            avatar,
             0,
             payload,
             Enum.Operation.DelegateCall

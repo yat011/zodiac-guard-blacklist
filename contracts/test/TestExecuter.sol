@@ -31,6 +31,7 @@ interface Guard {
 contract TestAvatar {
     address public module;
     address public guard;
+    address public owner;
     event ExecTransaction(bool success);
 
     receive() external payable {}
@@ -45,6 +46,14 @@ contract TestAvatar {
 
     function setGuard(address _guard) external {
         guard = _guard;
+    }
+
+    function setOwner(address _owner) external {
+        owner = _owner;
+    }
+
+    function isOwner(address _owner) public view returns (bool) {
+        return owner == _owner;
     }
 
     function execTransaction(

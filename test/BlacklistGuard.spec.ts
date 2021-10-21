@@ -118,7 +118,7 @@ describe("BlacklistGuard", async () => {
             const { guard } = await setupTests();
             await expect(
                 guard.connect(user2).setTarget(guard.address, true, true, "0x00000000", false)
-            ).to.be.revertedWith("Only 'avator' and owner can call");
+            ).to.be.revertedWith("Only 'avatar' and owner can call");
         });
 
         it("should completely block a target", async () => {
@@ -426,6 +426,30 @@ describe("BlacklistGuard", async () => {
 
 
     describe("requestSetTarget()", async () => {
+        it("should revert when called by non-avatar owner", async () => {
+            const { avatar, guard } = await setupTests();
+            await avatar.enableModule(guard.address);
+            await guard.renounceOwnership();
+
+            let result = guard.requestSetTarget(avatar.address, true, false, "0x00000000", false, {
+                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
+            });
+            await expect(result).to.revertedWith("Only avatar's Owner and owner can call");
+
+        });
+
+
+        it("should revert when called by non-guard owner", async () => {
+            const { avatar, guard } = await setupTests();
+            await avatar.enableModule(guard.address);
+            await guard.renounceOwnership();
+
+            let result = guard.connect(user2).requestSetTarget(avatar.address, true, false, "0x00000000", false, {
+                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
+            });
+            await expect(result).to.revertedWith("Only avatar's Owner and owner can call");
+
+        });
 
         it("should set Target by a callback from Avatar", async () => {
             const { avatar, guard } = await setupTests();
@@ -437,6 +461,20 @@ describe("BlacklistGuard", async () => {
             await expect(result).to.emit(avatar, "ExecTransaction")
 
             result = guard.requestSetTarget(avatar.address, true, false, "0x00000000", false, {
+                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
+            });
+            await expect(result).to.emit(guard, "SetTarget").withArgs(avatar.address, true, false, "0x00000000", false);
+            expect(await guard.isTargetAllBlocked(avatar.address)).to.be.equals(true);
+        });
+
+
+        it("can send setTargetRequest by avatar's owner", async () => {
+            const { avatar, guard } = await setupTests();
+            await avatar.enableModule(guard.address);
+            await guard.renounceOwnership();
+            await avatar.setOwner(user2.address);
+
+            let result = guard.connect(user2).requestSetTarget(avatar.address, true, false, "0x00000000", false, {
                 safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
             });
             await expect(result).to.emit(guard, "SetTarget").withArgs(avatar.address, true, false, "0x00000000", false);
@@ -508,6 +546,16 @@ describe("BlacklistGuard", async () => {
 
 
     describe("requestSetExceptionalSender()", async () => {
+        it("should revert when called by non-avatar owner", async () => {
+            const { avatar, guard } = await setupTests();
+            await avatar.enableModule(guard.address);
+            await guard.renounceOwnership();
+
+            let result = guard.requestSetExceptionalSender(avatar.address, user2.address, {
+                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
+            });
+            await expect(result).to.revertedWith("Only avatar's Owner and owner can call");
+        });
 
         it("should set exception by a callback from Avatar", async () => {
             const { avatar, guard } = await setupTests();
