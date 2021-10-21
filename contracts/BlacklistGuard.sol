@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity 0.8.6;
+pragma solidity 0.8.9;
 
 import "@gnosis.pm/zodiac/contracts/guard/BaseGuard.sol";
 import "@gnosis.pm/zodiac/contracts/factory/FactoryFriendly.sol";
