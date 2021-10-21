@@ -38,6 +38,16 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         mapping(bytes4 => bool) blockedFunctions;
         address exceptFromSender;
     }
+
+    struct SafeArgs {
+        uint256 safeTxGas;
+        uint256 baseGas;
+        uint256 gasPrice;
+        address gasToken;
+        address payable refundReceiver;
+        bytes signatures;
+    }
+
     mapping(address => Target) public blockedTargets;
 
     address public avator;
@@ -98,7 +108,7 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         );
     }
 
-    function setExecptionalSender(address target, address exceptionalSender)
+    function setExceptionalSender(address target, address exceptionalSender)
         external
         onlyAvatorAndOwner
     {
@@ -130,16 +140,7 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         return blockedTargets[target].exceptFromSender;
     }
 
-    struct SafeArgs {
-        uint256 safeTxGas;
-        uint256 baseGas;
-        uint256 gasPrice;
-        address gasToken;
-        address payable refundReceiver;
-        bytes signatures;
-    }
-
-    ///@dev TODO
+    ///@dev request the executor to call Avatar exec function. Then avatar run the Transaction for calling setTarget.
     function requestSetTarget(
         address target,
         bool blockAll,
@@ -158,7 +159,8 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         sendSafeTransaction(payload, safeArgs);
     }
 
-    function requestSetExecptionalSender(
+    ///@dev request the executor to call Avatar exec function. Then avatar run the Transaction.
+    function requestSetExceptionalSender(
         address target,
         address exceptionalSender,
         SafeArgs calldata safeArgs
@@ -193,7 +195,7 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         address exceptionalSender
     ) public pure returns (bytes memory) {
         bytes memory payload = abi.encodeWithSignature(
-            "setsetExecptionalSender(address,address)",
+            "setExceptionalSender(address,address)",
             target,
             exceptionalSender
         );
@@ -245,8 +247,25 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         // solhint-disallow-next-line no-unused-vars
         address payable,
         bytes memory,
-        address
-    ) external view override {}
+        address transactionSender
+    ) external view override {
+        if (blockedTargets[to].exceptFromSender == transactionSender) {
+            return;
+        }
+
+        require(!blockedTargets[to].allBlocked, "Target address is blocked");
+
+        require(
+            !((operation == Enum.Operation.DelegateCall) &&
+                blockedTargets[to].delegateCallBlocked),
+            "Delegate call not allowed to this address"
+        );
+
+        require(
+            !blockedTargets[to].blockedFunctions[bytes4(data)],
+            "The function call to the target is blocked"
+        );
+    }
 
     function checkAfterExecution(bytes32, bool) external view override {}
 }

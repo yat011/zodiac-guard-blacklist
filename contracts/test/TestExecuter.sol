@@ -35,6 +35,10 @@ contract TestAvatar {
 
     receive() external payable {}
 
+    fallback() external {
+        console.log("fallback in TestAvatar");
+    }
+
     function enableModule(address _module) external {
         module = _module;
     }
