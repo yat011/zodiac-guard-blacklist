@@ -5,15 +5,6 @@ import "@gnosis.pm/zodiac/contracts/guard/BaseGuard.sol";
 import "@gnosis.pm/zodiac/contracts/factory/FactoryFriendly.sol";
 import "@gnosis.pm/zodiac/contracts/core/Modifier.sol";
 
-interface Exectuer {
-    function execTransactionFromModule(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        Enum.Operation operation
-    ) external returns (bool success);
-}
-
 interface AvatarOwnerManager {
     function isOwner(address owner) external view returns (bool);
 }
@@ -32,8 +23,7 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
     event BlacklistGuardSetup(
         address initiator,
         address indexed owner,
-        address indexed avatar,
-        address executor
+        address indexed avatar
     );
 
     struct Target {
@@ -43,42 +33,12 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         address exceptFromSender;
     }
 
-    struct SafeArgs {
-        uint256 safeTxGas;
-        uint256 baseGas;
-        uint256 gasPrice;
-        address gasToken;
-        address payable refundReceiver;
-        bytes signatures;
-    }
-
     mapping(address => Target) public blockedTargets;
 
     address public avatar;
-    Exectuer public executor;
 
-    modifier onlyAvatarAndOwner() {
-        require(
-            msg.sender == avatar || msg.sender == owner(),
-            "Only 'avatar' and owner can call"
-        );
-        _;
-    }
-    modifier onlyAvatarOwnerAndOwner() {
-        require(
-            AvatarOwnerManager(avatar).isOwner(msg.sender) ||
-                msg.sender == owner(),
-            "Only avatar's Owner and owner can call"
-        );
-        _;
-    }
-
-    constructor(
-        address _owner,
-        address _avatar,
-        address _executor
-    ) {
-        bytes memory initializeParams = abi.encode(_owner, _avatar, _executor);
+    constructor(address _owner, address _avatar) {
+        bytes memory initializeParams = abi.encode(_owner, _avatar);
         setUp(initializeParams);
     }
 
@@ -86,26 +46,24 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override {
         __Ownable_init();
-        (address _owner, address _avatar, address _executor) = abi.decode(
+        (address _owner, address _avatar) = abi.decode(
             initializeParams,
-            (address, address, address)
+            (address, address)
         );
 
         transferOwnership(_owner);
         avatar = _avatar;
-        executor = Exectuer(_executor);
-
-        emit BlacklistGuardSetup(msg.sender, _owner, _avatar, _executor);
+        emit BlacklistGuardSetup(msg.sender, _owner, _avatar);
     }
 
-    /// @dev set the Target being Blocked. Only Avatar or Owner can call.
+    /// @dev set the Target being Blocked. Only  Owner can call.
     function setTarget(
         address target,
         bool blockAll,
         bool blockDelegateCall,
         bytes4 functionHash,
         bool blockFunction
-    ) external onlyAvatarAndOwner {
+    ) external onlyOwner {
         Target storage thisTarget = blockedTargets[target];
         thisTarget.allBlocked = blockAll;
         thisTarget.delegateCallBlocked = blockDelegateCall;
@@ -118,14 +76,6 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
             functionHash,
             blockFunction
         );
-    }
-
-    function setExceptionalSender(address target, address exceptionalSender)
-        external
-        onlyAvatarAndOwner
-    {
-        blockedTargets[target].exceptFromSender = exceptionalSender;
-        emit SetExceptionalSender(target, exceptionalSender);
     }
 
     function isTargetAllBlocked(address target) public view returns (bool) {
@@ -142,104 +92,6 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
 
     function isDelegateCallBlocked(address target) public view returns (bool) {
         return (blockedTargets[target].delegateCallBlocked);
-    }
-
-    function getExceptionalSender(address target)
-        public
-        view
-        returns (address)
-    {
-        return blockedTargets[target].exceptFromSender;
-    }
-
-    ///@dev request the executor to call Avatar's exec function. Then avatar run the Safe Transaction with data which calls setTarget.
-    function requestSetTarget(
-        address target,
-        bool blockAll,
-        bool blockDelegateCall,
-        bytes4 functionHash,
-        bool blockFunction,
-        SafeArgs calldata safeArgs
-    ) external onlyAvatarOwnerAndOwner {
-        bytes memory payload = encodeSetTargetData(
-            target,
-            blockAll,
-            blockDelegateCall,
-            functionHash,
-            blockFunction
-        );
-        sendSafeTransaction(payload, safeArgs);
-    }
-
-    ///@dev request the executor to call Avatar's exec function. Then avatar run the Safe Transaction with data which calls setExceptionalSender.
-    function requestSetExceptionalSender(
-        address target,
-        address exceptionalSender,
-        SafeArgs calldata safeArgs
-    ) external onlyAvatarOwnerAndOwner {
-        bytes memory payload = encodeSetExecptionalSender(
-            target,
-            exceptionalSender
-        );
-        sendSafeTransaction(payload, safeArgs);
-    }
-
-    function encodeSetTargetData(
-        address target,
-        bool blockAll,
-        bool blockDelegateCall,
-        bytes4 functionHash,
-        bool blockFunction
-    ) public pure returns (bytes memory) {
-        bytes memory payload = abi.encodeWithSignature(
-            "setTarget(address,bool,bool,bytes4,bool)",
-            target,
-            blockAll,
-            blockDelegateCall,
-            functionHash,
-            blockFunction
-        );
-        return payload;
-    }
-
-    function encodeSetExecptionalSender(
-        address target,
-        address exceptionalSender
-    ) public pure returns (bytes memory) {
-        bytes memory payload = abi.encodeWithSignature(
-            "setExceptionalSender(address,address)",
-            target,
-            exceptionalSender
-        );
-        return payload;
-    }
-
-    function sendSafeTransaction(bytes memory data, SafeArgs calldata safeArgs)
-        internal
-    {
-        string
-            memory funcSig = "execTransaction(address,uint256,bytes,uint8,uint256,uint256,uint256,address,address,bytes)";
-
-        bytes memory payload = abi.encodeWithSignature(
-            funcSig,
-            address(this),
-            0,
-            data,
-            Enum.Operation.Call,
-            safeArgs.safeTxGas,
-            safeArgs.baseGas,
-            safeArgs.gasPrice,
-            safeArgs.gasToken,
-            safeArgs.refundReceiver,
-            safeArgs.signatures
-        );
-
-        executor.execTransactionFromModule(
-            avatar,
-            0,
-            payload,
-            Enum.Operation.DelegateCall
-        );
     }
 
     fallback() external {
@@ -259,12 +111,8 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         // solhint-disallow-next-line no-unused-vars
         address payable,
         bytes memory,
-        address transactionSender
+        address
     ) external view override {
-        if (blockedTargets[to].exceptFromSender == transactionSender) {
-            return;
-        }
-
         require(!blockedTargets[to].allBlocked, "Target address is blocked");
 
         require(

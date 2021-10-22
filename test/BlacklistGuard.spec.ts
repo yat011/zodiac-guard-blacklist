@@ -2,7 +2,6 @@ import { expect } from "chai";
 import hre, { deployments, waffle, ethers } from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { AddressZero } from "@ethersproject/constants";
-import { exec } from "child_process";
 
 
 describe("BlacklistGuard", async () => {
@@ -14,9 +13,9 @@ describe("BlacklistGuard", async () => {
         const avatarFactory = await hre.ethers.getContractFactory("TestAvatar");
         const avatar = await avatarFactory.deploy();
         const guardFactory = await hre.ethers.getContractFactory("BlacklistGuard");
-        const guard = await guardFactory.deploy(user1.address, avatar.address, avatar.address);
-        const executorFactory = await hre.ethers.getContractFactory("TestExecutor");
-        const executor = await executorFactory.deploy();
+        const guard = await guardFactory.deploy(user1.address, avatar.address);
+        const modifierFactory = await hre.ethers.getContractFactory("TestModifier");
+        const modifier = await modifierFactory.deploy();
 
         await avatar.enableModule(user1.address);
         await avatar.setGuard(AddressZero);
@@ -39,7 +38,7 @@ describe("BlacklistGuard", async () => {
             guard,
             tx,
             initializeParams,
-            executor,
+            modifier,
             guardFactory
         };
     });
@@ -72,7 +71,7 @@ describe("BlacklistGuard", async () => {
         it("throws if owner is zero address", async () => {
             const { avatar } = await setupTests();
             const Guard = await hre.ethers.getContractFactory("BlacklistGuard");
-            await expect(Guard.deploy(AddressZero, avatar.address, avatar.address)).to.be.revertedWith(
+            await expect(Guard.deploy(AddressZero, avatar.address)).to.be.revertedWith(
                 "Ownable: new owner is the zero address"
             );
         });
@@ -80,12 +79,12 @@ describe("BlacklistGuard", async () => {
         it("should emit event because of successful set up", async () => {
             const { avatar } = await setupTests();
             const Guard = await hre.ethers.getContractFactory("BlacklistGuard");
-            const guard = await Guard.deploy(user1.address, avatar.address, avatar.address);
+            const guard = await Guard.deploy(user1.address, avatar.address);
             await guard.deployed();
 
             await expect(guard.deployTransaction)
                 .to.emit(guard, "BlacklistGuardSetup")
-                .withArgs(user1.address, user1.address, avatar.address, avatar.address);
+                .withArgs(user1.address, user1.address, avatar.address);
         });
     });
 
@@ -118,7 +117,7 @@ describe("BlacklistGuard", async () => {
             const { guard } = await setupTests();
             await expect(
                 guard.connect(user2).setTarget(guard.address, true, true, "0x00000000", false)
-            ).to.be.revertedWith("Only 'avatar' and owner can call");
+            ).to.be.revertedWith("Ownable: caller is not the owner");
         });
 
         it("should completely block a target", async () => {
@@ -131,9 +130,11 @@ describe("BlacklistGuard", async () => {
 
         });
 
-        it("can be set by avatar", async () => {
+        it("can be set by avatar after transfering ownership", async () => {
             const { avatar, guard } = await setupTests();
             const data = guard.interface.encodeFunctionData("setTarget", [avatar.address, true, false, "0x00000000", false]);
+
+            await guard.transferOwnership(avatar.address);
             const result = await avatar.connect(user2).execTransaction(guard.address, 0, data, 0, 0, 0, 0, AddressZero, AddressZero, "0x");
             await expect(result).to.emit(guard, "SetTarget").withArgs(avatar.address, true, false, "0x00000000", false);
             expect(await guard.isTargetAllBlocked(avatar.address)).to.be.equals(true);
@@ -168,18 +169,65 @@ describe("BlacklistGuard", async () => {
 
         });
 
+
+        it("should allow the setTarget call from avatar through modifier module", async () => {
+            const { avatar, modifier, guardFactory } = await setupTests();
+
+
+            const guard = await guardFactory.deploy(user1.address, avatar.address);
+
+            await modifier.enableModule(avatar.address);
+            await modifier.setTarget(avatar.address);
+            await avatar.enableModule(modifier.address);
+
+            await avatar.setGuard(guard.address);
+
+
+            const funcSig = guard.interface.encodeFunctionData("setTarget", [guard.address, false, false, "0x00000000", false]).slice(0, 10);
+            await guard.setTarget(guard.address, false, false, funcSig, true);
+            expect(await guard.isFunctionBlocked(guard.address, funcSig)).to.be.equals(true);
+
+
+
+            await guard.transferOwnership(avatar.address);
+            const data = guard.interface.encodeFunctionData("setTarget", [guard.address, false, false, funcSig, false]);
+            const modifierData = modifier.interface.encodeFunctionData("execTransactionFromModule", [guard.address, 0, data, 0]);
+            await avatar.execTransaction(modifier.address, 0, modifierData, 0, 0, 0, 0, AddressZero, AddressZero, "0x");
+
+            let delayedResult = await modifier.executeNextTx();
+            await expect(delayedResult).to.emit(guard, "SetTarget").withArgs(guard.address, false, false, funcSig, false);
+            expect(await guard.isFunctionBlocked(guard.address, funcSig)).to.be.equals(false);
+        });
+
+
+        it("should block the direct setTarget call from avatar.", async () => {
+            const { avatar, modifier, guardFactory } = await setupTests();
+
+
+            const guard = await guardFactory.deploy(user1.address, avatar.address);
+
+            await modifier.enableModule(avatar.address);
+            await modifier.setTarget(avatar.address);
+            await avatar.enableModule(modifier.address);
+
+            await avatar.setGuard(guard.address);
+
+
+            const funcSig = guard.interface.encodeFunctionData("setTarget", [guard.address, false, false, "0x00000000", false]).slice(0, 10);
+            await guard.setTarget(guard.address, false, false, funcSig, true);
+            expect(await guard.isFunctionBlocked(guard.address, funcSig)).to.be.equals(true);
+
+
+
+            await guard.transferOwnership(avatar.address);
+            const data = guard.interface.encodeFunctionData("setTarget", [guard.address, false, false, funcSig, false]);
+            //avatar try to unblock
+            await expect(avatar.execTransaction(guard.address, 0, data, 0, 0, 0, 0, AddressZero, AddressZero, "0x")).
+                to.be.revertedWith("The function call to the target is blocked");
+        });
+
     });
 
-
-    describe("setExecptionalSender", async () => {
-        it("should set Exceptional sender", async () => {
-            const { avatar, guard } = await setupTests();
-            await expect(await guard.getExceptionalSender(avatar.address)).to.be.equals(AddressZero);
-            await expect(await guard.setExceptionalSender(avatar.address, user3.address)).to.emit(guard, "SetExceptionalSender").withArgs(avatar.address, user3.address);
-            await expect(await guard.getExceptionalSender(avatar.address)).to.be.equals(user3.address);
-
-        })
-    })
 
 
 
@@ -329,54 +377,6 @@ describe("BlacklistGuard", async () => {
 
         });
 
-        it("should allow the function call to the target if the sender is exceptional", async () => {
-            const { guard, avatar, tx } = await setupTests();
-
-            tx.data = "0x12345678"
-            await guard.setTarget(tx.to, false, false, tx.data, true);
-            await guard.setExceptionalSender(tx.to, user3.address);
-
-            await guard.checkTransaction(
-                tx.to,
-                tx.value,
-                tx.data,
-                tx.operation,
-                tx.avatarTxGas,
-                tx.baseGas,
-                tx.gasPrice,
-                tx.gasToken,
-                tx.refundReceiver,
-                tx.signatures,
-                user3.address
-            );
-
-
-        });
-        it("should allow the function call to the target if the sender is NOT exceptional", async () => {
-            const { guard, avatar, tx } = await setupTests();
-
-            tx.data = "0x12345678"
-            await guard.setTarget(tx.to, false, false, tx.data, true);
-            await guard.setExceptionalSender(tx.to, user3.address);
-
-            await expect(
-                guard.checkTransaction(
-                    tx.to,
-                    tx.value,
-                    tx.data,
-                    tx.operation,
-                    tx.avatarTxGas,
-                    tx.baseGas,
-                    tx.gasPrice,
-                    tx.gasToken,
-                    tx.refundReceiver,
-                    tx.signatures,
-                    user1.address
-                )
-            ).to.be.revertedWith("The function call to the target is blocked");
-
-
-        });
 
         it("it should be callable by a avatar", async () => {
             const { avatar, guard, tx } = await setupTests();
@@ -401,15 +401,14 @@ describe("BlacklistGuard", async () => {
 
 
         it("should block avatar from calling target func", async () => {
-            const { avatar, executor, guardFactory } = await setupTests();
+            const { avatar, modifier, guardFactory } = await setupTests();
 
 
-            const guard = await guardFactory.deploy(user1.address, avatar.address, executor.address)
-            await executor.enableModule(guard.address);
-            await executor.setTarget(avatar.address);
-            await avatar.enableModule(executor.address);
+            const guard = await guardFactory.deploy(user1.address, avatar.address)
+            await modifier.enableModule(guard.address);
+            await modifier.setTarget(avatar.address);
+            await avatar.enableModule(modifier.address);
             await avatar.setGuard(guard.address);
-            await guard.setExceptionalSender(guard.address, executor.address);
 
 
             const funcSig = guard.interface.encodeFunctionData("setTarget", [guard.address, false, false, "0x00000000", false]).slice(0, 10);
@@ -424,175 +423,6 @@ describe("BlacklistGuard", async () => {
         });
     });
 
-
-    describe("requestSetTarget()", async () => {
-        it("should revert when called by non-avatar owner", async () => {
-            const { avatar, guard } = await setupTests();
-            await avatar.enableModule(guard.address);
-            await guard.renounceOwnership();
-
-            let result = guard.requestSetTarget(avatar.address, true, false, "0x00000000", false, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-            await expect(result).to.revertedWith("Only avatar's Owner and owner can call");
-
-        });
-
-
-        it("should revert when called by non-guard owner", async () => {
-            const { avatar, guard } = await setupTests();
-            await avatar.enableModule(guard.address);
-            await guard.renounceOwnership();
-
-            let result = guard.connect(user2).requestSetTarget(avatar.address, true, false, "0x00000000", false, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-            await expect(result).to.revertedWith("Only avatar's Owner and owner can call");
-
-        });
-
-        it("should set Target by a callback from Avatar", async () => {
-            const { avatar, guard } = await setupTests();
-            await avatar.enableModule(guard.address);
-
-            let result = guard.requestSetTarget(avatar.address, true, false, "0x00000000", false, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-            await expect(result).to.emit(avatar, "ExecTransaction")
-
-            result = guard.requestSetTarget(avatar.address, true, false, "0x00000000", false, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-            await expect(result).to.emit(guard, "SetTarget").withArgs(avatar.address, true, false, "0x00000000", false);
-            expect(await guard.isTargetAllBlocked(avatar.address)).to.be.equals(true);
-        });
-
-
-        it("can send setTargetRequest by avatar's owner", async () => {
-            const { avatar, guard } = await setupTests();
-            await avatar.enableModule(guard.address);
-            await guard.renounceOwnership();
-            await avatar.setOwner(user2.address);
-
-            let result = guard.connect(user2).requestSetTarget(avatar.address, true, false, "0x00000000", false, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-            await expect(result).to.emit(guard, "SetTarget").withArgs(avatar.address, true, false, "0x00000000", false);
-            expect(await guard.isTargetAllBlocked(avatar.address)).to.be.equals(true);
-        });
-
-        it("should send request to an executor, and set Target by a callback", async () => {
-            const { avatar, executor, guardFactory } = await setupTests();
-
-
-            const guard = await guardFactory.deploy(user1.address, avatar.address, executor.address)
-            await executor.enableModule(guard.address);
-            await executor.setTarget(avatar.address);
-            await avatar.enableModule(executor.address);
-
-
-            let result = await guard.requestSetTarget(avatar.address, true, false, "0x00000000", false, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-
-            await expect(result).not.to.emit(avatar, "ExecTransaction");
-
-            result = await guard.requestSetTarget(avatar.address, true, false, "0x00000000", false, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-            await expect(result).not.to.emit(guard, "SetTarget").withArgs(avatar.address, true, false, "0x00000000", false);
-            expect(await guard.isTargetAllBlocked(avatar.address)).to.be.equals(false);
-
-
-            let delayedResult = await executor.executeNextTx();
-            await expect(delayedResult).to.emit(guard, "SetTarget").withArgs(avatar.address, true, false, "0x00000000", false);
-            expect(await guard.isTargetAllBlocked(avatar.address)).to.be.equals(true);
-        });
-
-
-        it("should allow the setTarget request which is executed by the exceptionalSender (executor)", async () => {
-            const { avatar, executor, guardFactory } = await setupTests();
-
-
-            const guard = await guardFactory.deploy(user1.address, avatar.address, executor.address)
-            await executor.enableModule(guard.address);
-            await executor.setTarget(avatar.address);
-            await avatar.enableModule(executor.address);
-            await avatar.setGuard(guard.address);
-            await guard.setExceptionalSender(guard.address, executor.address);
-
-
-            const funcSig = guard.interface.encodeFunctionData("setTarget", [guard.address, false, false, "0x00000000", false]).slice(0, 10);
-            await guard.setTarget(guard.address, false, false, funcSig, true);
-            expect(await guard.isFunctionBlocked(guard.address, funcSig)).to.be.equals(true);
-
-
-            //avatar try to unblock
-            const data = guard.interface.encodeFunctionData("setTarget", [guard.address, false, false, funcSig, false]);
-            await expect(avatar.execTransaction(guard.address, 0, data, 0, 0, 0, 0, AddressZero, AddressZero, "0x")).
-                to.be.revertedWith("The function call to the target is blocked");
-
-
-            await guard.requestSetTarget(guard.address, false, false, funcSig, false, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-
-            let delayedResult = await executor.executeNextTx();
-            await expect(delayedResult).to.emit(guard, "SetTarget").withArgs(guard.address, false, false, funcSig, false);
-            expect(await guard.isFunctionBlocked(guard.address, funcSig)).to.be.equals(false);
-        });
-    })
-
-
-
-    describe("requestSetExceptionalSender()", async () => {
-        it("should revert when called by non-avatar owner", async () => {
-            const { avatar, guard } = await setupTests();
-            await avatar.enableModule(guard.address);
-            await guard.renounceOwnership();
-
-            let result = guard.requestSetExceptionalSender(avatar.address, user2.address, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-            await expect(result).to.revertedWith("Only avatar's Owner and owner can call");
-        });
-
-        it("should set exception by a callback from Avatar", async () => {
-            const { avatar, guard } = await setupTests();
-            await avatar.enableModule(guard.address);
-
-            let result = guard.requestSetExceptionalSender(avatar.address, user2.address, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-            await expect(result).to.emit(guard, "SetExceptionalSender").withArgs(avatar.address, user2.address);
-            expect(await guard.getExceptionalSender(avatar.address)).to.be.equals(user2.address);
-        });
-
-
-        it("should send request to an executor, and set exceptional sender by a callback", async () => {
-            const { avatar, executor, guardFactory } = await setupTests();
-
-
-            const guard = await guardFactory.deploy(user1.address, avatar.address, executor.address)
-            await executor.enableModule(guard.address);
-            await executor.setTarget(avatar.address);
-            await avatar.enableModule(executor.address);
-
-
-
-            let result = guard.requestSetExceptionalSender(avatar.address, user2.address, {
-                safeTxGas: 0, baseGas: 0, gasPrice: 0, gasToken: AddressZero, refundReceiver: AddressZero, signatures: "0x"
-            });
-
-            await expect(result).not.to.emit(guard, "SetExceptionalSender");
-            expect(await guard.getExceptionalSender(avatar.address)).to.be.equals(AddressZero);
-
-
-            let delayedResult = await executor.executeNextTx();
-            await expect(delayedResult).to.emit(guard, "SetExceptionalSender").withArgs(avatar.address, user2.address);
-            expect(await guard.getExceptionalSender(avatar.address)).to.be.equals(user2.address);
-        });
-    })
 
 
     describe("isTargetAllBlocked", async () => {

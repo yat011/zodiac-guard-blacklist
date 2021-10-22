@@ -107,7 +107,7 @@ contract TestAvatar {
     }
 }
 
-contract TestExecutor {
+contract TestModifier {
     address public module;
     address payable public target;
 
