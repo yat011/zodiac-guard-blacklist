@@ -7,8 +7,14 @@ import "hardhat-deploy";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
+import { HttpNetworkUserConfig } from "hardhat/types";
+import "./src/tasks/deploy_verify"
+import "./src/tasks/tasks"
+import "./src/tasks/deploy_all"
 
 dotenv.config();
+const { INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY } = process.env;
+
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -22,14 +28,25 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
-
+const sharedNetworkConfig: HttpNetworkUserConfig = {}
+sharedNetworkConfig.accounts = {
+  mnemonic: MNEMONIC || "none",
+};
 const config: HardhatUserConfig = {
   solidity: "0.8.9",
+  paths: {
+    deploy: "src/deploy",
+  },
+  namedAccounts: {
+    deployer: 0,
+  },
+  defaultNetwork: "hardhat",
   networks: {
-    ropsten: {
-      url: process.env.ROPSTEN_URL || "",
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    hardhat: {
+    },
+    rinkeby: {
+      ...sharedNetworkConfig,
+      url: `https://rinkeby.infura.io/v3/${INFURA_KEY}`,
     },
   },
   gasReporter: {

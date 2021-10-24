@@ -13,13 +13,13 @@ describe("BlacklistGuard", async () => {
         const avatarFactory = await hre.ethers.getContractFactory("TestAvatar");
         const avatar = await avatarFactory.deploy();
         const guardFactory = await hre.ethers.getContractFactory("BlacklistGuard");
-        const guard = await guardFactory.deploy(user1.address, avatar.address);
+        const guard = await guardFactory.deploy(user1.address);
         const modifierFactory = await hre.ethers.getContractFactory("TestModifier");
         const modifier = await modifierFactory.deploy();
 
         await avatar.enableModule(user1.address);
         await avatar.setGuard(AddressZero);
-        const initializeParams = abiCoder.encode(["address", "address", "address"], [user1.address, avatar.address, avatar.address]);
+        const initializeParams = abiCoder.encode(["address"], [user1.address]);
 
         const tx = {
             to: avatar.address,
@@ -71,7 +71,7 @@ describe("BlacklistGuard", async () => {
         it("throws if owner is zero address", async () => {
             const { avatar } = await setupTests();
             const Guard = await hre.ethers.getContractFactory("BlacklistGuard");
-            await expect(Guard.deploy(AddressZero, avatar.address)).to.be.revertedWith(
+            await expect(Guard.deploy(AddressZero)).to.be.revertedWith(
                 "Ownable: new owner is the zero address"
             );
         });
@@ -79,12 +79,12 @@ describe("BlacklistGuard", async () => {
         it("should emit event because of successful set up", async () => {
             const { avatar } = await setupTests();
             const Guard = await hre.ethers.getContractFactory("BlacklistGuard");
-            const guard = await Guard.deploy(user1.address, avatar.address);
+            const guard = await Guard.deploy(user1.address);
             await guard.deployed();
 
             await expect(guard.deployTransaction)
                 .to.emit(guard, "BlacklistGuardSetup")
-                .withArgs(user1.address, user1.address, avatar.address);
+                .withArgs(user1.address, user1.address);
         });
     });
 
@@ -174,7 +174,7 @@ describe("BlacklistGuard", async () => {
             const { avatar, modifier, guardFactory } = await setupTests();
 
 
-            const guard = await guardFactory.deploy(user1.address, avatar.address);
+            const guard = await guardFactory.deploy(user1.address);
 
             await modifier.enableModule(avatar.address);
             await modifier.setTarget(avatar.address);
@@ -204,7 +204,7 @@ describe("BlacklistGuard", async () => {
             const { avatar, modifier, guardFactory } = await setupTests();
 
 
-            const guard = await guardFactory.deploy(user1.address, avatar.address);
+            const guard = await guardFactory.deploy(user1.address);
 
             await modifier.enableModule(avatar.address);
             await modifier.setTarget(avatar.address);
@@ -404,7 +404,7 @@ describe("BlacklistGuard", async () => {
             const { avatar, modifier, guardFactory } = await setupTests();
 
 
-            const guard = await guardFactory.deploy(user1.address, avatar.address)
+            const guard = await guardFactory.deploy(user1.address);
             await modifier.enableModule(guard.address);
             await modifier.setTarget(avatar.address);
             await avatar.enableModule(modifier.address);

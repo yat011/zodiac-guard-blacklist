@@ -5,10 +5,6 @@ import "@gnosis.pm/zodiac/contracts/guard/BaseGuard.sol";
 import "@gnosis.pm/zodiac/contracts/factory/FactoryFriendly.sol";
 import "@gnosis.pm/zodiac/contracts/core/Modifier.sol";
 
-interface AvatarOwnerManager {
-    function isOwner(address owner) external view returns (bool);
-}
-
 contract BlacklistGuard is FactoryFriendly, BaseGuard {
     event SetTarget(
         address target,
@@ -20,25 +16,18 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
 
     event SetExceptionalSender(address target, address exceptionalSender);
 
-    event BlacklistGuardSetup(
-        address initiator,
-        address indexed owner,
-        address indexed avatar
-    );
+    event BlacklistGuardSetup(address initiator, address indexed owner);
 
     struct Target {
         bool allBlocked;
         bool delegateCallBlocked;
         mapping(bytes4 => bool) blockedFunctions;
-        address exceptFromSender;
     }
 
     mapping(address => Target) public blockedTargets;
 
-    address public avatar;
-
-    constructor(address _owner, address _avatar) {
-        bytes memory initializeParams = abi.encode(_owner, _avatar);
+    constructor(address _owner) {
+        bytes memory initializeParams = abi.encode(_owner);
         setUp(initializeParams);
     }
 
@@ -46,14 +35,10 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override {
         __Ownable_init();
-        (address _owner, address _avatar) = abi.decode(
-            initializeParams,
-            (address, address)
-        );
+        address _owner = abi.decode(initializeParams, (address));
 
         transferOwnership(_owner);
-        avatar = _avatar;
-        emit BlacklistGuardSetup(msg.sender, _owner, _avatar);
+        emit BlacklistGuardSetup(msg.sender, _owner);
     }
 
     /// @dev set the Target being Blocked. Only  Owner can call.
