@@ -14,8 +14,6 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         bool blockFunction
     );
 
-    event SetExceptionalSender(address target, address exceptionalSender);
-
     event BlacklistGuardSetup(address initiator, address indexed owner);
 
     struct Target {
