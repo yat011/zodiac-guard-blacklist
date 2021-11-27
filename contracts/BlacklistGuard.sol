@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity 0.8.9;
+pragma solidity ^0.8.6;
 
 import "@gnosis.pm/zodiac/contracts/guard/BaseGuard.sol";
 import "@gnosis.pm/zodiac/contracts/factory/FactoryFriendly.sol";
 import "@gnosis.pm/zodiac/contracts/core/Modifier.sol";
 
 contract BlacklistGuard is FactoryFriendly, BaseGuard {
-    event SetTarget(
-        address target,
-        bool blockAll,
-        bool delegateCallBlocked,
-        bytes4 functionHash,
-        bool blockFunction
-    );
+    event SetTargetAllBlocked(address target, bool isBlock);
+    event SetDelegateCallBlocked(address target, bool isBlock);
+    event SetBlockedFunction(address target, bytes4 functionSig, bool isBlock);
+    event SetSendBlocked(address target, bool isBlock);
 
     event BlacklistGuardSetup(address initiator, address indexed owner);
 
@@ -39,30 +36,66 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         emit BlacklistGuardSetup(msg.sender, _owner);
     }
 
-    /// @dev set the Target being Blocked. Only  Owner can call.
-    function setTarget(
-        address target,
-        bool blockAll,
-        bool blockDelegateCall,
-        bytes4 functionHash,
-        bool blockFunction
-    ) external onlyOwner {
-        Target storage thisTarget = blockedTargets[target];
-        thisTarget.allBlocked = blockAll;
-        thisTarget.delegateCallBlocked = blockDelegateCall;
-        thisTarget.blockedFunctions[functionHash] = blockFunction;
+    // /// @dev set the Target being Blocked. Only  Owner can call.
+    // function setTarget(
+    //     address target,
+    //     bool blockAll,
+    //     bool blockDelegateCall,
+    //     bytes4 functionHash,
+    //     bool blockFunction
+    // ) external onlyOwner {
+    //     Target storage thisTarget = blockedTargets[target];
+    //     thisTarget.allBlocked = blockAll;
+    //     thisTarget.delegateCallBlocked = blockDelegateCall;
+    //     thisTarget.blockedFunctions[functionHash] = blockFunction;
 
-        emit SetTarget(
-            target,
-            blockAll,
-            blockDelegateCall,
-            functionHash,
-            blockFunction
-        );
+    //     emit SetTarget(
+    //         target,
+    //         blockAll,
+    //         blockDelegateCall,
+    //         functionHash,
+    //         blockFunction
+    //     );
+    // }
+
+    /// ============ Setters ===============
+    function setTargetAllBlocked(address target, bool isBlock)
+        public
+        onlyOwner
+    {
+        blockedTargets[target].allBlocked = isBlock;
+        emit SetTargetAllBlocked(target, isBlock);
     }
 
+    function setDelegateCallBlocked(address target, bool isBlock)
+        public
+        onlyOwner
+    {
+        blockedTargets[target].delegateCallBlocked = isBlock;
+        emit SetDelegateCallBlocked(target, isBlock);
+    }
+
+    function setBlockedFunction(
+        address target,
+        bytes4 functionSig,
+        bool isBlock
+    ) public onlyOwner {
+        blockedTargets[target].blockedFunctions[functionSig] = isBlock;
+        emit SetBlockedFunction(target, functionSig, isBlock);
+    }
+
+    function setSendBlocked(address target, bool isBlock) public onlyOwner {
+        blockedTargets[target].blockedFunctions[bytes4("0x")] = isBlock;
+        emit SetSendBlocked(target, isBlock);
+    }
+
+    /// ============= Getters ===============
     function isTargetAllBlocked(address target) public view returns (bool) {
         return (blockedTargets[target].allBlocked);
+    }
+
+    function isDelegateCallBlocked(address target) public view returns (bool) {
+        return (blockedTargets[target].delegateCallBlocked);
     }
 
     function isFunctionBlocked(address target, bytes4 functionSig)
@@ -73,8 +106,8 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
         return (blockedTargets[target].blockedFunctions[functionSig]);
     }
 
-    function isDelegateCallBlocked(address target) public view returns (bool) {
-        return (blockedTargets[target].delegateCallBlocked);
+    function isSendBlocked(address target) public view returns (bool) {
+        return (blockedTargets[target].blockedFunctions[bytes4("0x")]);
     }
 
     fallback() external {
@@ -104,10 +137,18 @@ contract BlacklistGuard is FactoryFriendly, BaseGuard {
             "Delegate call not allowed to this address"
         );
 
-        require(
-            !blockedTargets[to].blockedFunctions[bytes4(data)],
-            "The function call to the target is blocked"
-        );
+        if (data.length >= 4) {
+            require(
+                !blockedTargets[to].blockedFunctions[bytes4(data)],
+                "The function call to the target is blocked"
+            );
+        } else {
+            require(data.length == 0, "Function signature too short");
+            require(
+                !blockedTargets[to].blockedFunctions[bytes4("0x")],
+                "Cannot send to this address"
+            );
+        }
     }
 
     function checkAfterExecution(bytes32, bool) external view override {}

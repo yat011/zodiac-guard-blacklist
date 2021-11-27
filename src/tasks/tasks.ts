@@ -62,66 +62,66 @@ task("deployProxy", "Deploys a Guard")
     .addParam("owner", "Address of the Owner", undefined, types.string)
     .setAction(deployGuard);
 
-task("setTarget", "Block a target address.")
-    .addParam(
-        "guard",
-        "The address of the guard that you are seting up.",
-        undefined,
-        types.string
-    )
-    .addParam(
-        "target",
-        "The target address to be blocked.",
-        undefined,
-        types.string
-    )
-    .addParam(
-        "blockall",
-        "Block all access to the Target",
-        false,
-        types.boolean
-    )
-    .addParam(
-        "blockdelegate",
-        "Block delegatedCall",
-        false,
-        types.boolean
-    )
-    .addParam(
-        "funcsig",
-        "The signature of the target blocked function",
-        null,
-        types.string
-    )
-    .addParam(
-        "blockfunc",
-        "Block the target function",
-        false,
-        types.boolean
-    )
-    .setAction(async (taskArgs, hardhatRuntime) => {
-        const [caller] = await hardhatRuntime.ethers.getSigners();
-        console.log("Using the account:", caller.address);
+// task("setTarget", "Block a target address.")
+//     .addParam(
+//         "guard",
+//         "The address of the guard that you are seting up.",
+//         undefined,
+//         types.string
+//     )
+//     .addParam(
+//         "target",
+//         "The target address to be blocked.",
+//         undefined,
+//         types.string
+//     )
+//     .addParam(
+//         "blockall",
+//         "Block all access to the Target",
+//         false,
+//         types.boolean
+//     )
+//     .addParam(
+//         "blockdelegate",
+//         "Block delegatedCall",
+//         false,
+//         types.boolean
+//     )
+//     .addParam(
+//         "funcsig",
+//         "The signature of the target blocked function",
+//         null,
+//         types.string
+//     )
+//     .addParam(
+//         "blockfunc",
+//         "Block the target function",
+//         false,
+//         types.boolean
+//     )
+//     .setAction(async (taskArgs, hardhatRuntime) => {
+//         const [caller] = await hardhatRuntime.ethers.getSigners();
+//         console.log("Using the account:", caller.address);
 
-        const guard = await hardhatRuntime.ethers.getContractAt(
-            "BlacklistGuard",
-            taskArgs.guard
-        );
-        let funcHash = "0x00000000";
-        if (taskArgs.funcsig !== null) {
-            funcHash = keccak256(utils.toUtf8Bytes(taskArgs.funcsig)).slice(0, 10);
-        }
+//         const guard = await hardhatRuntime.ethers.getContractAt(
+//             "BlacklistGuard",
+//             taskArgs.guard
+//         );
+//         let funcHash = "0x00000000";
+//         if (taskArgs.funcsig !== null) {
+//             funcHash = keccak256(utils.toUtf8Bytes(taskArgs.funcsig)).slice(0, 10);
+//         }
 
-        await guard.setTarget(
-            taskArgs.target,
-            taskArgs.blockall,
-            taskArgs.blockdelegate,
-            funcHash,
-            taskArgs.blockfunc
-        );
+//         await guard.setTarget(
+//             taskArgs.target,
+//             taskArgs.blockall,
+//             taskArgs.blockdelegate,
+//             funcHash,
+//             taskArgs.blockfunc
+//         );
 
-        console.log("Target blocked: ", taskArgs);
-    });
+//         console.log("Target blocked: ", taskArgs);
+//     });
 
 task(
     "transferOwnership",
@@ -284,160 +284,160 @@ task("enableDelayModule")
     });
 
 
-task("sendSetTargetTxToDelay", "Block a target address.")
-    .addParam(
-        "avatar",
-        "The address of the guard that you are seting up.",
-        undefined,
-        types.string
-    )
-    .addParam("delay", "Address of the delay", undefined, types.string)
-    .addParam(
-        "guard",
-        "The address of the guard that you are seting up.",
-        undefined,
-        types.string
-    )
-    .addParam(
-        "target",
-        "The target address to be blocked.",
-        undefined,
-        types.string
-    )
-    .addParam(
-        "blockall",
-        "Block all access to the Target",
-        false,
-        types.boolean
-    )
-    .addParam(
-        "blockdelegate",
-        "Block delegatedCall",
-        false,
-        types.boolean
-    )
-    .addParam(
-        "funcsig",
-        "The signature of the target blocked function",
-        null,
-        types.string
-    )
-    .addParam(
-        "blockfunc",
-        "Block the target function",
-        false,
-        types.boolean
-    )
-    .setAction(async (taskArgs, hardhatRuntime) => {
-        const [caller] = await hardhatRuntime.ethers.getSigners();
-        console.log("Using the account:", caller.address);
+// task("sendSetTargetTxToDelay", "Block a target address.")
+//     .addParam(
+//         "avatar",
+//         "The address of the guard that you are seting up.",
+//         undefined,
+//         types.string
+//     )
+//     .addParam("delay", "Address of the delay", undefined, types.string)
+//     .addParam(
+//         "guard",
+//         "The address of the guard that you are seting up.",
+//         undefined,
+//         types.string
+//     )
+//     .addParam(
+//         "target",
+//         "The target address to be blocked.",
+//         undefined,
+//         types.string
+//     )
+//     .addParam(
+//         "blockall",
+//         "Block all access to the Target",
+//         false,
+//         types.boolean
+//     )
+//     .addParam(
+//         "blockdelegate",
+//         "Block delegatedCall",
+//         false,
+//         types.boolean
+//     )
+//     .addParam(
+//         "funcsig",
+//         "The signature of the target blocked function",
+//         null,
+//         types.string
+//     )
+//     .addParam(
+//         "blockfunc",
+//         "Block the target function",
+//         false,
+//         types.boolean
+//     )
+//     .setAction(async (taskArgs, hardhatRuntime) => {
+//         const [caller] = await hardhatRuntime.ethers.getSigners();
+//         console.log("Using the account:", caller.address);
 
-        const guard = await hardhatRuntime.ethers.getContractAt(
-            "BlacklistGuard",
-            taskArgs.guard
-        );
+//         const guard = await hardhatRuntime.ethers.getContractAt(
+//             "BlacklistGuard",
+//             taskArgs.guard
+//         );
 
-        const delayABI = CONTRACT_ABIS['delay'].slice();
-        delayABI.push("function execTransactionFromModule(address,uint256,bytes,uint8) public returns (bool success)")
+//         const delayABI = CONTRACT_ABIS['delay'].slice();
+//         delayABI.push("function execTransactionFromModule(address,uint256,bytes,uint8) public returns (bool success)")
 
-        const delayModifier = new Contract(taskArgs.delay, delayABI, hardhatRuntime.ethers.provider);
+//         const delayModifier = new Contract(taskArgs.delay, delayABI, hardhatRuntime.ethers.provider);
 
-        const safeDeployment = getSafeSingletonDeployment({ version: "1.3.0" });
-        assert(safeDeployment !== undefined);
-        const avatar = new Contract(taskArgs.avatar, safeDeployment.abi, hardhatRuntime.ethers.provider);
+//         const safeDeployment = getSafeSingletonDeployment({ version: "1.3.0" });
+//         assert(safeDeployment !== undefined);
+//         const avatar = new Contract(taskArgs.avatar, safeDeployment.abi, hardhatRuntime.ethers.provider);
 
-        const [user1] = await hardhatRuntime.ethers.getSigners();
+//         const [user1] = await hardhatRuntime.ethers.getSigners();
 
-        let funcHash = "0x00000000";
-        if (taskArgs.funcsig !== null) {
-            funcHash = keccak256(utils.toUtf8Bytes(taskArgs.funcsig)).slice(0, 10);
-        }
+//         let funcHash = "0x00000000";
+//         if (taskArgs.funcsig !== null) {
+//             funcHash = keccak256(utils.toUtf8Bytes(taskArgs.funcsig)).slice(0, 10);
+//         }
 
-        const data = await guard.interface.encodeFunctionData("setTarget",
-            [taskArgs.target,
-            taskArgs.blockall,
-            taskArgs.blockdelegate,
-                funcHash,
-            taskArgs.blockfunc])
+//         const data = await guard.interface.encodeFunctionData("setTarget",
+//             [taskArgs.target,
+//             taskArgs.blockall,
+//             taskArgs.blockdelegate,
+//                 funcHash,
+//             taskArgs.blockfunc])
 
-        const delayData = delayModifier.interface.encodeFunctionData("execTransactionFromModule(address,uint256,bytes,uint8)", [guard.address, 0, data, 0]);
+//         const delayData = delayModifier.interface.encodeFunctionData("execTransactionFromModule(address,uint256,bytes,uint8)", [guard.address, 0, data, 0]);
 
-        await sendSafeTransaction(user1, avatar, delayModifier.address, delayData, hardhatRuntime);
+//         await sendSafeTransaction(user1, avatar, delayModifier.address, delayData, hardhatRuntime);
 
-    });
-
-
-task("execDelayedSetTarget", "Block a target address.")
-    .addParam("delay", "Address of the delay", undefined, types.string)
-    .addParam(
-        "guard",
-        "The address of the guard that you are seting up.",
-        undefined,
-        types.string
-    )
-    .addParam(
-        "target",
-        "The target address to be blocked.",
-        undefined,
-        types.string
-    )
-    .addParam(
-        "blockall",
-        "Block all access to the Target",
-        false,
-        types.boolean
-    )
-    .addParam(
-        "blockdelegate",
-        "Block delegatedCall",
-        false,
-        types.boolean
-    )
-    .addParam(
-        "funcsig",
-        "The signature of the target blocked function",
-        null,
-        types.string
-    )
-    .addParam(
-        "blockfunc",
-        "Block the target function",
-        false,
-        types.boolean
-    )
-    .setAction(async (taskArgs, hardhatRuntime) => {
-        const [caller] = await hardhatRuntime.ethers.getSigners();
-        console.log("Using the account:", caller.address);
-
-        const guard = await hardhatRuntime.ethers.getContractAt(
-            "BlacklistGuard",
-            taskArgs.guard
-        );
-
-        const delayABI = CONTRACT_ABIS['delay'].slice();
-        delayABI.push("function execTransactionFromModule(address,uint256,bytes,uint8) public returns (bool success)")
-        delayABI.push("function executeNextTx(address,uint256,bytes,uint8) public")
-
-        const delayModifier = new Contract(taskArgs.delay, delayABI, hardhatRuntime.ethers.provider);
+//     });
 
 
-        const [user1] = await hardhatRuntime.ethers.getSigners();
+// task("execDelayedSetTarget", "Block a target address.")
+//     .addParam("delay", "Address of the delay", undefined, types.string)
+//     .addParam(
+//         "guard",
+//         "The address of the guard that you are seting up.",
+//         undefined,
+//         types.string
+//     )
+//     .addParam(
+//         "target",
+//         "The target address to be blocked.",
+//         undefined,
+//         types.string
+//     )
+//     .addParam(
+//         "blockall",
+//         "Block all access to the Target",
+//         false,
+//         types.boolean
+//     )
+//     .addParam(
+//         "blockdelegate",
+//         "Block delegatedCall",
+//         false,
+//         types.boolean
+//     )
+//     .addParam(
+//         "funcsig",
+//         "The signature of the target blocked function",
+//         null,
+//         types.string
+//     )
+//     .addParam(
+//         "blockfunc",
+//         "Block the target function",
+//         false,
+//         types.boolean
+//     )
+//     .setAction(async (taskArgs, hardhatRuntime) => {
+//         const [caller] = await hardhatRuntime.ethers.getSigners();
+//         console.log("Using the account:", caller.address);
 
-        let funcHash = "0x00000000";
-        if (taskArgs.funcsig !== null) {
-            funcHash = keccak256(utils.toUtf8Bytes(taskArgs.funcsig)).slice(0, 10);
-        }
+//         const guard = await hardhatRuntime.ethers.getContractAt(
+//             "BlacklistGuard",
+//             taskArgs.guard
+//         );
 
-        const data = await guard.interface.encodeFunctionData("setTarget",
-            [taskArgs.target,
-            taskArgs.blockall,
-            taskArgs.blockdelegate,
-                funcHash,
-            taskArgs.blockfunc])
+//         const delayABI = CONTRACT_ABIS['delay'].slice();
+//         delayABI.push("function execTransactionFromModule(address,uint256,bytes,uint8) public returns (bool success)")
+//         delayABI.push("function executeNextTx(address,uint256,bytes,uint8) public")
 
-        await delayModifier.connect(user1).executeNextTx(guard.address, 0, data, 0);
+//         const delayModifier = new Contract(taskArgs.delay, delayABI, hardhatRuntime.ethers.provider);
 
-    });
+
+//         const [user1] = await hardhatRuntime.ethers.getSigners();
+
+//         let funcHash = "0x00000000";
+//         if (taskArgs.funcsig !== null) {
+//             funcHash = keccak256(utils.toUtf8Bytes(taskArgs.funcsig)).slice(0, 10);
+//         }
+
+//         const data = await guard.interface.encodeFunctionData("setTarget",
+//             [taskArgs.target,
+//             taskArgs.blockall,
+//             taskArgs.blockdelegate,
+//                 funcHash,
+//             taskArgs.blockfunc])
+
+//         await delayModifier.connect(user1).executeNextTx(guard.address, 0, data, 0);
+
+//     });
 
 
 

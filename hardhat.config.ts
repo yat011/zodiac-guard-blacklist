@@ -11,6 +11,7 @@ import { HttpNetworkUserConfig } from "hardhat/types";
 import "./src/tasks/deploy_verify"
 import "./src/tasks/tasks"
 import "./src/tasks/deploy_all"
+require('solidity-coverage');
 
 dotenv.config();
 const { INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY } = process.env;
